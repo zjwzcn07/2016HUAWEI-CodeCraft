@@ -1,0 +1,38 @@
+#ifndef __CGREEDY_DFS_H
+#define __CGREEDY_DFS_H
+
+#include "CSolveInterface.h"
+
+#include "CSolveInterface.h"
+#include <vector>
+#include <map>
+#include <set>
+#include <list>
+
+
+class CGreedyDFS:public CSolveInterface
+{
+	/* constructor and decontructor */
+public:
+	CGreedyDFS(CProblem *pro=NULL, int gm=0);
+	~CGreedyDFS(){}
+	
+	/* interface */
+public:
+	void DoSolve(void);
+
+	/* member fun */
+private:
+	void __dfs(int code, int cost, std::vector<int> vp, std::vector<bool> visited, int deep);
+	void __updateAnswer(int cost, const std::vector<int> route);
+	bool __isThrAllVisited(const std::vector<bool> &vis);
+	void __loadCannotThrough(std::vector<int> &cannotThrough, int arivPos);
+	/* member var */
+private:
+	std::vector<int> thr;
+	int pointDeep;
+	int greedyMethod;
+	bool bkFg;
+};
+
+#endif

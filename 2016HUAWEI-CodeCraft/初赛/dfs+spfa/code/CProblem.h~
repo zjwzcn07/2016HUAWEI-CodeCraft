@@ -1,0 +1,66 @@
+#ifndef __PROBEL__H
+#define __PROBEL__H
+
+#include <vector>
+#include <string>
+
+class CGraph;
+class CSolveInterface;
+class CShortestInterface;
+
+struct pRESUL
+{
+	bool fg;
+	std::vector<int> pathVertesxSet;			//sour->dest的路径顶点集
+	std::vector<int> pathEdgeSet;				//sour->dest的边集
+	int minCost;								//sour->dest的最小损耗(权重)
+};
+
+class CProblem
+{
+	/* friend unity */
+
+	/* construct and destory */
+public:
+	CProblem(char *gra[5000], const int e);
+	~CProblem(void);
+
+	/* member function */
+public:
+	/* basic opera */
+	void SetDemand(char *demand);
+	void PrintProblemInform(void);
+	void PrintResult(void);
+	
+	void Solve(void);
+
+
+	/* read only */
+	inline double GetCpx(void)			{	return mdCpx;		}
+	inline short GetSour(void )			{	return msSour;	}
+	inline short GetDest(void)			{	return msDest;	}
+	inline short GetThrough(short i)	{	return mThrough.at(i);	}
+	inline short GetThroughSize(void)	{	return mThrough.size();	}
+private:
+	void __LoadSolve(void);
+	void __Vertex2EdgeCode(void);
+	void __UpdateCpx(void);
+
+	/* member var */
+private:
+	//问题描述
+	short msSour;						//问题原点
+	short msDest;						//问题目标点
+	double mdCpx;						//问题复杂度
+	std::vector<int> mThrough;			//问题经过点
+	//问题解决接口
+	CSolveInterface *mSi;
+
+public:
+	pRESUL mPresult;
+	CGraph *mGraph;					//问题图
+	int StartTime;
+};
+
+#endif
+

@@ -1,0 +1,190 @@
+#include "CProblem.h"
+#include "CGraph.h"
+
+#include "CSolveInterface.h"
+#include "CXing.h"
+
+#include <stdio.h>
+#include <string>
+#include <vector>
+#include <set>
+#include <sstream>
+#include <math.h>
+#include <ctime>
+
+using namespace std;
+
+
+//装载当前问题的解决方案
+void CProblem::__LoadSolve(void)
+{
+	mSi = new CXing(this);
+}
+
+//
+void CProblem::__UpdateCpx(void)
+{
+	//根据中间点个数 计算一部分复杂度
+	double cpx1=1/(1+exp(-1.2 * (double(mThrough.size())-15)/5.0));
+
+	//根据平均出度 计算一部分复杂度
+	int out=0;
+	double cpx2=0;
+	for(int i=0; i<mThrough.size(); i++)
+	{
+		for(int j=0; j<mGraph->GetVertexNum(); j++)
+		{
+			if(mGraph->GetArc(mThrough[i], j)!=UNDEFINE)
+				out++;
+		}
+	}
+	cpx2=double(out)/mThrough.size();
+	
+	//根据边和顶点数，计算一部分复杂度
+	double cpx3=double(mGraph->GetEdgeNum())/mGraph->GetVertexNum();
+
+
+	mdCpx = cpx1;
+}
+
+CProblem::~CProblem(void)
+{
+	if(mGraph)
+		delete mGraph;
+	if(mSi)
+		delete mSi;
+}
+
+CProblem::CProblem(char *gra[5000], const int e):mGraph(new CGraph(gra, e)), mSi(NULL), mdCpx(UNDEFINE)
+{
+	mPresult.pathVertesxSet.clear();
+	mPresult.pathEdgeSet.clear();
+	mPresult.minCost=UNDEFINE;
+}
+
+void CProblem::SetDemand(char *demand)
+{
+	int c, cnt=0;
+	string str[3], thr;
+	string strDemand(demand);
+
+	//',' -> ' '
+	while((c=strDemand.find(','))!=-1)
+		strDemand[c]=' ';
+
+	istringstream ss(strDemand);	//transform to istringstream!
+	while((ss>>str[cnt++])&&cnt<3);
+
+	// set sour and dest
+	msSour=stoi(str[0]);msDest=stoi(str[1]);
+
+	//set through
+	mThrough.clear();				//clean througn
+	thr=str[2];
+	while((c=thr.find('|'))!=-1)
+		thr[c]=' ';
+	istringstream ss2(thr);			//transform to istringstream!
+	while(ss2>>c)
+		mThrough.push_back(c);
+
+	mPresult.pathVertesxSet.clear();
+	mPresult.pathEdgeSet.clear();
+	mPresult.minCost=UNDEFINE;
+
+	//更新复杂度
+	__UpdateCpx();
+	//图预处理
+	mGraph->PerprocessGraph(this->GetDest());
+}
+
+void CProblem::PrintProblemInform(void)
+{
+	/* 邻接矩阵 */
+	printf("邻接矩阵:\n");
+	for(int i=0; i<mGraph->GetVertexNum(); i++){
+		for(int j=0; j<mGraph->GetVertexNum(); j++){
+			mGraph->GetArc(i, j) != UNDEFINE ? printf("%3d ", mGraph->GetArc(i,j)) : printf("### ");
+		}
+		printf("\n");
+	}
+
+	/* 边的邻接矩阵 */
+	printf("\n边编号邻接\n");
+	for(int i=0; i<mGraph->GetVertexNum(); i++){
+		for(int j=0; j<mGraph->GetVertexNum(); j++){
+			mGraph->GetEdgeCode(i,j) != UNDEFINE ? printf("%3d ", mGraph->GetEdgeCode(i,j)) : printf("### ");
+		}
+		printf("\n");
+	}
+	/* 问题要求 */
+	printf("\n问题要求\n");
+	msSour!=UNDEFINE ? printf("source\t:%3d\n",msSour) : printf("source:###\n");
+	msDest!=UNDEFINE ? printf("dest\t:%3d\n",msDest) : printf("dest:###\n");
+	printf("through\t: ");
+	for(auto a=mThrough.begin(); a!=mThrough.end(); a++){
+		printf("%d ", *a);
+	}
+	printf("\n");
+}
+
+void CProblem::PrintResult(void)
+{
+	printf("V%d to V%d\n", msSour, msDest);
+	if(mPresult.fg){
+		printf("顶点集:");
+		for(auto a=mPresult.pathVertesxSet.begin(); a!=mPresult.pathVertesxSet.end(); a++){
+			printf("%d ",*a);
+		}
+		printf("\n");
+
+		printf("边集:");
+		for(auto a=mPresult.pathEdgeSet.begin(); a!=mPresult.pathEdgeSet.end(); a++){
+			printf("%d ",*a);
+		}
+		printf("\n");
+		printf("minCost: %d\n", mPresult.minCost);
+	}
+	else
+	{
+		printf("无解\n");
+	}
+}
+
+void CProblem::__Vertex2EdgeCode(void)
+{
+	mPresult.pathEdgeSet.clear();
+	for(int i=0; i<mPresult.pathVertesxSet.size()-1; i++){
+		mPresult.pathEdgeSet.push_back( mGraph->GetEdgeCode(mPresult.pathVertesxSet[i],mPresult.pathVertesxSet[i+1]) );
+	}
+}
+
+/*
+
+*/
+void CProblem::Solve(void)
+{
+	//重置si
+	if(mSi==NULL)
+	{
+		__LoadSolve();
+	}
+	else
+	{
+		delete mSi;mSi=NULL;
+		__LoadSolve();
+	}
+
+	//解决
+	mSi->DoSolve();
+
+	//记录结果
+	if(mSi->sres.fg)
+	{
+		mPresult.fg=true;
+		mPresult.minCost=mSi->sres.minCost;
+		mPresult.pathVertesxSet=mSi->sres.pathVertesxSet;
+		__Vertex2EdgeCode();
+	}
+	else
+		mPresult.fg=false;
+}

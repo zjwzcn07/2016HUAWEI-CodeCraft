@@ -1,0 +1,225 @@
+#include"mYscheme.h"
+#include "memo.h"
+#include "CProblem.h"
+#include "CGraph.h"
+#include "lib_time.h"
+#include <algorithm>
+//#include <iostream>
+using namespace std;
+
+
+struct LogData 
+{
+	double logd;
+	int id;
+};
+int cmp( const void *a ,const void *b)
+
+{
+	return (*(LogData *)a).logd > (*(LogData *)b).logd ? 1 : -1;
+}
+
+
+mYscheme::mYscheme(CProblem *pro /* = NULL */):CSolveInterface(pro)
+{
+	int ThroughSize;
+	ThroughSize = pro->GetThroughSize();
+	through = new int[ThroughSize];
+	for (int i = 0;i <ThroughSize;i++)
+	{
+		through[i] = pro->GetThrough(i);
+		//through.push_back(pro->GetThrough(i));
+	}
+	min_cost = 6000;
+	min_PathNode.clear();
+	sres.fg = 0;
+	sres.minCost = 6000;
+}
+mYscheme::~mYscheme()
+{
+
+}
+
+void mYscheme::DoSolve()
+{
+	myschProcess();
+	/*do 
+	{
+		myschProcess();
+		for (int i = 0;i <pro->GetThroughSize();i++)
+		{
+			printf("%4d",through[i]);
+		}
+		printf("\n");
+	} while (next_permutation(through,through+pro->GetThroughSize()));*/
+
+}
+
+int mYscheme::SandPerm(double org)
+{
+	//全排列中随机的取全排列
+	int len = pro->GetThroughSize();
+	struct LogData *logdata = new struct LogData[len];
+	logdata[0].logd  = org;logdata[0].id = 0;
+	for (int i  = 1;i<len;i++)
+	{
+		logdata[i].logd = 1 - 2*logdata[i-1].logd*logdata[i-1].logd;
+		logdata[i].id = i;
+	}
+	qsort(logdata,len,sizeof(LogData),cmp);
+	int swaplen = (len%2 == 0)?len/2:len/2+1;
+	for (int i = 0;i<swaplen;i++)
+	{
+		swap(through[i],through[logdata[i].id]);
+	}
+	/*for (int i = 0;i < len;i++)
+	{
+		printf("%d ",through[i]);
+	}
+	printf("\n==========================\n");*/
+	delete []logdata;
+	return 0;
+}
+
+void mYscheme::myschProcess()
+{
+	int len = pro->GetThroughSize();
+	double tt = (1/double(len));
+	int round_len = 500000 * tt;
+	for (int i = 0;i<round_len;i++)
+	{
+		double b = 0.9;double a = -0.9;
+		double org = ((double)rand()/RAND_MAX)*(b-a) + a;/*产生区间[a,b]上的随机数*/
+		SandPerm(org);
+		init();
+		VirtThrough.push_back(pro->GetSour());
+		VirtThrough.insert(VirtThrough.end(),through,through+pro->GetThroughSize());
+		VirtThrough.push_back(pro->GetDest());
+		int flag = SearchPath();
+		if (flag == 1)
+		{
+			sres.fg = 1;
+			if(sres.minCost > cost)
+			{
+				sres.pathVertesxSet=PathNode;
+				sres.minCost=cost;
+			}
+			int tim = get_time();
+			if(get_time() > 9000)
+			{
+				break;
+			}
+		}
+	}
+}
+			
+void mYscheme::init()
+{
+	Noused.clear();
+	PathNode.clear();
+	cost = 6000;
+	VirtThrough.clear();
+	//min_cost = 6000;
+	//min_PathNode.clear();
+}
+
+int  mYscheme::SearchPath()
+{
+	//PathNode.push_back();
+	int len  = pro->GetThroughSize();
+	CGraph *gra = pro->mGraph;
+	cost = 6000;
+	//TempThrough.push_back(pro->)
+	//int cost = 0;
+	PathNode.push_back(VirtThrough[0]);
+	std::vector<int> PathNode_len(len + 2,0);
+	std::vector<int> Cost_throught(len + 2,0);
+	int count = 0;
+	int search_count = 5;
+	int tempNoused_num;
+	int starti = -1;
+	for (int i = 0;i < len + 1;)
+	{
+		AddNoused(i);
+		if(starti != -1)
+		{
+			Noused.push_back(tempNoused_num);
+		}
+		//PathNode.push_back(through[i]);
+		std::vector<int> tempPath;
+		std::vector<int> tempNoused(Noused);
+		int tempCost;
+		tempCost = gra->Shortest(VirtThrough[i],VirtThrough[i+1],&tempPath,Noused);
+		if(rand()%10 < 3 && tempPath.size()>1)
+		{
+			int len = tempPath.size();
+			int irand = (rand()%(len - 1)+ len - 1)%(len - 1);
+			tempNoused.push_back(tempPath[irand]);
+            tempCost = gra->Shortest(VirtThrough[i],VirtThrough[i+1],&tempPath,tempNoused);
+		}
+		//cost = cost + tempCost;
+		PathNode.insert(PathNode.end(),tempPath.begin(),tempPath.end());
+		int tempi = (i == 0)?0:i-1;
+		PathNode_len[i+1] = PathNode_len[i] + tempPath.size();
+		Cost_throught[i+1] = Cost_throught[i] + tempCost;
+		//Noused[i] = through[i];Noused[i+1]  =through[i+1];
+		if (tempCost >=UNDEFINE)
+		{
+			if(count == 0)
+			{
+				search_count = i+1;
+			}
+			count++;
+			if (i == 0)
+			{
+				return 0;
+			}
+			else
+			{
+				starti = rand()%i;
+				int len = PathNode_len[starti + 1] - PathNode_len[starti]; 
+				if (len > 1)
+				{
+					int irand = (rand()%(len - 1)+ len - 1)%(len - 1);
+					tempNoused_num = PathNode.at(PathNode_len[starti] + irand);
+					
+				}
+				PathNode.erase(PathNode.begin()+PathNode_len[starti] + 1,PathNode.end());
+				if (len <= 1)
+				{
+					tempNoused_num  = PathNode.back();
+				}
+				i = starti;
+				continue;
+			}
+		}
+		if(count > search_count)
+		{
+			return 0;
+		}
+		starti = -1;
+		i  =i + 1;
+	}
+	cost = Cost_throught.back();
+	return 1;
+}
+
+void mYscheme::AddNoused(int i)
+{
+	Noused.clear();
+	Noused.insert(Noused.end(),PathNode.begin(),PathNode.end());
+	int len = pro->GetThroughSize();
+	for (int j = i+2;j < len + 2;j++)
+	{
+		Noused.push_back(VirtThrough[j]);
+	}
+	//printf("%d\n",pro->GetCpx());
+	/*int choosN = pro->GetThroughSize()* 0.2;
+	for (int j = 0;j < choosN;j++)
+	{
+		
+		int randnum = rand()%(pro->graph->GetVertexNum());
+		Noused.push_back(randnum);
+	}*/
+
+}

@@ -1,0 +1,90 @@
+#include "CUcs.h"
+#include "memo.h"
+#include "CGraph.h"
+#include "common.h"
+
+#include <queue>
+
+using namespace std;
+
+void CUcs::__LoadArc(CGraph *graph, int v, int w, const vector<int> &outVertex)
+{
+	//缓存arc
+	for(int i=0; i<graph->GetVertexNum(); i++)
+	{
+		for(int j=0; j<graph->GetVertexNum(); j++)
+		{
+			bufArc[i][j]=graph->GetArc(i, j);
+		}
+	}
+	if(outVertex.size())
+	{
+		for(auto b=outVertex.begin(); b!=outVertex.end(); b++)
+		{
+			if((*b==v)||(*b<0))	continue;		//起始点不能隔绝了撒，不然就没的路了
+			for(int j=0; j<graph->GetVertexNum(); j++){
+				bufArc[*b][j]=UNDEFINE;
+				bufArc[j][*b]=UNDEFINE;
+			}
+		}
+	}
+}
+
+/*
+ *
+ *跑出来的路径是除开了起点v的
+ *
+ */
+int CUcs::DoShortest(CGraph *graph, int v, int w, vector<int> *path, const vector<int> &outVertex)
+{
+	vNum=graph->GetVertexNum();
+	if(!bufArc)
+		bufArc=Apply2DMemory(vNum, vNum);
+
+	__LoadArc(graph, v, w, outVertex);
+	//start
+	int cost=UNDEFINE;
+	vector<bool> visited(vNum, false);						//记录了v to i的最短路径是否已经计算
+	vector<int> dist(vNum, UNDEFINE);						//记录了v to i的最短路径损耗(最小权重)
+	vector<vector<int>> vertexSet(graph->GetVertexNum());	//记录了v to i的最短路径所经过的顶点
+	priority_queue<node> q;
+
+	//initial
+	dist[v]=0;
+	q.push(node(v, dist[v]));
+
+	while(!q.empty())
+	{
+		node x = q.top();
+		q.pop();
+		if(visited[x.id])	continue;
+		else				visited[x.id]=true;
+		dist[x.id]=x.cost;
+
+		//找到了目标点 直接退出
+		if(x.id==w) {cost = x.cost; break;}
+		for(int i=0; i<vNum; i++)
+		{
+			int childCost = bufArc[x.id][i];
+			if(dist[i]>childCost+x.cost)
+			{
+				dist[i]=childCost+x.cost;
+				q.push(node(i, dist[i]));
+				vertexSet[i]=vertexSet[x.id];
+				vertexSet[i].push_back(i);
+
+//				if(i==w)	break;
+			}
+		}
+	}
+	
+//update path
+	if(path!=NULL)
+	{
+		path->clear();
+		*path = vertexSet[w];
+	}
+
+//return
+	return dist[w];
+}

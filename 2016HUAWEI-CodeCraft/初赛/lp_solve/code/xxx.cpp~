@@ -1,0 +1,275 @@
+#include "route.h"
+#include "lib_record.h"
+#include <iostream>
+#include <cstring>
+#include <cstdio>
+#include <queue>
+#include <stack>
+#include <map>
+#include <algorithm>
+#include <ctime>
+
+using namespace std;
+
+struct VER_PROPER
+{
+	VER_PROPER(int _id, int _cst):id(_id),cost(_cst){}
+	int id;
+    int cost;
+    bool operator < (const VER_PROPER &m)const
+    {
+        return id < m.id;
+    }
+};
+
+vector <vector<VER_PROPER>> Map;
+vector <int> Demand;
+vector <int> Answer;
+vector <int> temp;
+vector <int> result;
+int Answer_Cost;
+int Rank[606];
+int Visited1[606][55];
+int Visited2[606][1300];
+int LinkID[606][606];
+int mark[606];
+int StartID;
+int EndID;
+int StartTime;
+
+void add_edge(int * tp)
+{
+        int linkID = tp[0];
+        int sourceID = tp[1];
+        int destinationID = tp[2];
+        int cost = tp[3];
+        int flag = 0;
+        for (int i = 0; i < Map[sourceID].size(); i++)
+        {
+			if (Map[sourceID][i].id == destinationID)
+            {
+				if (Map[sourceID][i].cost <= cost)
+                {
+                        flag = 2;
+                }
+                else
+                {
+                        flag = 1;
+                        Map[sourceID][i].cost = cost;
+                }
+            }
+        }
+        //cout<<linkID<<" "<<sourceID<<" "<<destinationID<<" "<<cost<<" "<<flag<<endl;
+        if (flag != 2)
+        {
+                LinkID[sourceID][destinationID] = linkID;
+                if (flag == 0)
+                {
+					Map[sourceID].push_back(VER_PROPER(destinationID, cost));
+                }
+        }
+}
+
+void get(char * s,int *tp)
+{
+        int i = 0;
+        int cnt = 0;
+        int p = 0;
+        int len = strlen(s);
+        while (i<len)
+        {
+                if (s[i] >= '0' && s[i] <= '9')
+                {
+                        p = p * 10 + s[i] - '0';
+                }
+                if (i + 1 == len || s[i] <'0' || s[i] > '9')
+                {
+                        tp[cnt] = p;
+                        p = 0;
+                        cnt++;
+                }
+                if (cnt == 4)
+                        return ;
+                i++;
+        }
+}
+
+void add_demand(char * demand)
+{
+        int len = strlen(demand);
+        int temp[100];
+        int p = 0;
+        int cnt = 0;
+        //printf("%s\n",demand);
+        for (int i = 0; i < len; i++)
+        {
+                if (demand[i] >= '0' && demand[i] <= '9')
+                {
+                        p = p * 10 + demand[i] - '0';
+                }
+                if (i + 1 == len || demand[i] < '0' || demand[i] > '9')
+                {
+                        temp[cnt] = p;
+                        p = 0;
+                        cnt++;
+                }
+        }
+        StartID = temp[0];
+        EndID = temp[1];
+        for (int i = 2; i < cnt; i++)
+        {
+                Demand.push_back(temp[i]);
+                Rank[temp[i]] = Demand.size();		//某个必经点在demand中的位置
+        }
+        return ;
+}
+
+void init()
+{
+        memset(Rank, -1, sizeof(Rank));
+        memset(Visited1, -1, sizeof(Visited1));
+        memset(Visited2, -1, sizeof(Visited2));
+        memset(LinkID, -1, sizeof(LinkID));
+        memset(mark,-1,sizeof(mark));
+        Answer_Cost = -1;
+}
+
+void dfs1(int cur, int cost, long long status, int cnt, int sum)
+{
+//        if (clock() >= StartTime + CLOCKS_PER_SEC * 9)
+//                return ;
+        if (cost >= Answer_Cost && Answer_Cost != -1)
+                return ;
+        if (mark[cur] != -1)
+                return ;
+        if (Rank[cur] != -1)			//是必经点
+        {
+                long long t = Rank[cur];
+                long long p = (1<<t);
+                status|=p;
+                int q = Rank[cur];
+                sum = sum + q;
+                cnt++;
+        }
+        if (Visited1[cur][cnt] != -1 && Visited1[cur][cnt] <= cost)
+                return ;
+        Visited1[cur][cnt] = cost;
+        if (Visited2[cur][sum] == -1 || Visited2[cur][sum] > cost)
+                Visited2[cur][sum] = cost;
+        if (cur == EndID)
+        {
+                //cout<<cnt<<endl;
+                if (cnt != Demand.size())
+                        return ;
+                if (Answer_Cost == -1 || Answer_Cost > cost)
+                {
+                        Answer_Cost = cost;
+                        Answer.clear();
+                        for (int i = 0; i < temp.size(); i++)
+                        {
+                                Answer.push_back(temp[i]);
+                        }
+                }
+                return ;
+        }
+        mark[cur] = 1;
+        for (int i = Map[cur].size() - 1; i >= 0; i--)
+        {
+                int next = Map[cur][i].id;
+                temp.push_back(next);
+                dfs1(next, cost + Map[cur][i].cost, status, cnt, sum);
+                temp.pop_back();
+        }
+        mark[cur] = -1;
+        return ;
+}
+
+void dfs2(int cur, int cost, long long status, int cnt, int sum)
+{
+        if (clock() >= StartTime + CLOCKS_PER_SEC * 9)
+                return ;
+        if (cost >= Answer_Cost && Answer_Cost != -1)
+                return ;
+        if (mark[cur] != -1)
+                return ;
+        if (Rank[cur] != -1)
+        {
+                long long t = Rank[cur];
+                long long p = (1<<t);
+                status|=p;
+                int q = Rank[cur];
+                sum = sum + q;
+                cnt++;
+        }
+        if (Visited2[cur][sum] != -1 && Visited2[cur][sum] < cost)
+                return ;
+        Visited2[cur][sum] = cost;
+        if (cur == EndID)
+        {
+                //cout<<cnt<<endl;
+                if (cnt != Demand.size())
+                        return ;
+                if (Answer_Cost == -1 || Answer_Cost > cost)
+                {
+                        Answer_Cost = cost;
+                        Answer.clear();
+                        for (int i = 0; i < temp.size(); i++)
+                        {
+                                Answer.push_back(temp[i]);
+                        }
+                }
+                return ;
+        }
+        mark[cur] = 1;
+        for (int i = Map[cur].size() - 1; i >= 0; i--)
+        {
+                int next = Map[cur][i].id;
+                temp.push_back(next);
+                dfs2(next, cost + Map[cur][i].cost, status, cnt, sum);
+                temp.pop_back();
+        }
+        mark[cur] = -1;
+        return ;
+}
+
+void add_result()
+{
+        if (Answer_Cost == -1)
+                return ;
+        result.push_back(LinkID[Answer[0]][Answer[1]]);
+        for (int i = 1; i < Answer.size() -1; i++)
+                result.push_back(LinkID[Answer[i]][Answer[i+1]]);
+        return ;
+}
+
+//你要完成的功能总入口
+void search_route(char *topo[5000], int edge_num, char *demand)
+{
+        init();
+		Map.resize(600);
+        for (int i = 0; i < edge_num; i++)
+        {
+                int tp[20];
+                get(topo[i],tp);
+                add_edge(tp);
+        }
+		for(int i=0; i<600; i++)
+		{
+			sort(Map[i].begin(), Map[i].end());
+		}
+        add_demand(demand);
+        temp.push_back(StartID);
+        StartTime = clock();
+        cout<<StartTime<<endl;
+        dfs1(StartID, 0, 0, 0, 0);
+        memset(Visited1, -1, sizeof(Visited1));
+ //       dfs2(StartID, 0, 0, 0, 0);
+        cout<<clock()<<endl;
+        cout<<"ANSWER: "<<Answer_Cost<<endl;
+        add_result();
+	for (int i = 0; i < result.size(); i++)
+        {
+                record_result(result[i]);
+        }
+}
+

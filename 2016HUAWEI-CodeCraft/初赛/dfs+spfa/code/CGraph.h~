@@ -1,0 +1,44 @@
+#ifndef __GRAPH_H
+#define __GRAPH_H
+
+#include<vector>
+#include<string>
+#include<list>
+#include<map>
+
+#define DYNAMIC_DEBUG 0
+
+#define UNDEFINE 60000
+
+class CShortestInterface;
+
+class CGraph{
+	/* construct and destory */
+public:
+	CGraph(char **graph, const int &e);
+	~CGraph();
+
+	/* member fun */
+public:
+	int Shortest(int v, int w, std::vector<int> *path=NULL, const std::vector<int> &outVertex=std::vector<int>());
+	void SetShortest(CShortestInterface *si_);
+	void SortAdjList(void);			//整理邻接表!?
+	void PerprocessGraph(int dest);
+
+
+	/* read only */
+	inline int GetArc(const int i, const int j){	return mArc[i][j];	}
+	inline int GetEdgeCode(const int i, const int j){	return mEdgeCode[i][j];	}
+	inline int GetVertexNum(void){	return miVertexNum;	}
+	inline int GetEdgeNum(void){	return miEdgeNum;	}
+	std::vector<std::vector<int>> *mAdjList;			//
+	std::vector<std::vector<int>> *revAdjList;			//逆邻接表
+	/* member var */
+private:
+	int **mArc;										//邻接矩阵
+	int **mEdgeCode;								//保存路径的邻接矩阵
+	int miVertexNum, miEdgeNum;						//顶点和边的个数
+	CShortestInterface *mSi;
+};
+
+#endif

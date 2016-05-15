@@ -1,0 +1,126 @@
+#include "CXing.h"
+
+#include "CGraph.h"
+#include "CProblem.h"
+#include <algorithm>
+#include <ctime>
+#include <cstring>
+
+using namespace std;
+
+CXing::CXing(CProblem *pro):CSolveInterface(pro)
+{
+	//配置必经点
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		thr.push_back(pro->GetThrough(i));
+		Rank[pro->GetThrough(i)] = thr.size();		//必经点在demand中的下标位置+1
+	}
+
+	//
+	mVertexStateCost.resize(pro->mGraph->GetVertexNum());
+}
+
+void CXing::DoSolve(void)
+{
+	sres.minCost=UNDEFINE;
+	vector<int> vp;
+	vector<bool> visited(pro->mGraph->GetVertexNum(), false);
+	__dfs(pro->GetSour(), 0, vp, visited, 0);
+}
+
+void CXing::__dfs(int code, int cost, std::vector<int> vp, std::vector<bool> visited, int deep)
+{
+	if (clock() >= pro->StartTime + CLOCKS_PER_SEC * 9)	return ;
+
+	visited[code]=true;
+	vp.push_back(code);
+
+	if(__cutVer(code, cost, visited))	return ;
+
+    if (code == pro->GetDest())
+    {
+		if(!__isIncludeFullThr(visited))	return;
+		__updateAnswer(cost, vp);
+    }
+
+	for(int i = pro->mGraph->mAdjList->at(code).size()-1; i>=0; i--)
+    {
+            int next = pro->mGraph->mAdjList->at(code)[i];
+
+			if(visited[next])	continue;
+			__dfs(next, cost+pro->mGraph->GetArc(code, next), vp, visited, deep+1);
+    }
+}
+
+bool CXing::__isIncludeFullThr(const std::vector<bool> &vis)
+{
+	//只要有一个必经点没到，都退出
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		if(!vis[pro->GetThrough(i)])
+			return false;
+	}
+
+	return true;
+}
+
+bool CXing::__cutVer(int code, int cost, const std::vector<bool> &visited)
+{
+	//1).conditoin:在已经跑出来的情况下，若当前路径到当前点时，权值比已有路径大，就没必要继续往下跑了！
+	if((sres.fg)&&(cost>=sres.minCost))
+	{
+		return true;
+	}
+
+	//2).conditoin:历史状态刷新失败，因为历史状态的损耗比这次的好，因此cut掉
+	if(!__updateVertexState(code, cost, visited))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool CXing::__updateVertexState(int code, const int cost, const vector<bool> &visited)
+{
+	int thrNum=0;			//必经点个数
+	int &state = thrNum;
+	
+	//计算状态
+	for(auto b=thr.begin(); b!=thr.end(); b++)
+	{
+		if(visited[*b])
+		{
+			thrNum++;
+		}
+	}
+	
+	//刷新状态
+	if( mVertexStateCost[code].count(state)==0 )
+	{
+		mVertexStateCost[code][state] = cost;
+		return true;		//已经刷新
+	}
+	else
+	{
+		if(mVertexStateCost[code].at(state)>cost)
+		{
+			mVertexStateCost[code].at(state) = cost;
+			return true;	//已经刷新
+		}
+		else
+			return false;	//没办法, 没有刷新，因为新状态没有以前的好。
+	}
+}
+
+void CXing::__updateAnswer(const int cost, const std::vector<int> &vp)
+{
+	sres.fg=true;
+	if(sres.minCost>cost)
+	{
+		sres.pathVertesxSet=vp;
+		sres.minCost=cost;
+	}
+}
+

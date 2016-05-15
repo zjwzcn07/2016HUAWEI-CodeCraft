@@ -1,0 +1,37 @@
+#ifndef __CXING_H
+#define __CXING_H
+
+#include "CSolveInterface.h"
+
+#include "CSolveInterface.h"
+#include <vector>
+#include <map>
+#include <set>
+
+class CXing:public CSolveInterface
+{
+	/* constructor and decontructor */
+public:
+	CXing(CProblem *pro=NULL);
+	~CXing(){}
+	
+	/* interface */
+public:
+	void DoSolve(void);
+
+	/* member fun */
+private:
+	void __dfs(int code, int cost, std::vector<int> vp, std::vector<bool> visited, int deep);
+	bool __updateVertexState(int code, const int cost, const std::vector<bool> &visited);
+	bool __cutVer(int code, int cost, const std::vector<bool> &visited);
+	bool __isIncludeFullThr(const std::vector<bool> &vis);
+	void __updateAnswer(const int cost, const std::vector<int> &vp);
+
+	/* member var */
+private:
+	std::vector<int> thr;		//±Ø¾­µã
+	std::vector<std::map<int, int>> mVertexStateCost;
+	int Rank[606];
+};
+
+#endif

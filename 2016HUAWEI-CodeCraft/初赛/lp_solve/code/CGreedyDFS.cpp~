@@ -1,0 +1,143 @@
+#include "CGreedyDFS.h"
+
+#include "CGraph.h"
+#include "CProblem.h"
+#include "common.h"
+
+#include <algorithm>
+#include <ctime>
+
+
+using namespace std;
+
+CGreedyDFS::CGreedyDFS(CProblem *pro, int gm):CSolveInterface(pro),pointDeep(-1),bkFg(false),greedyMethod(gm)
+{
+	if(pro)
+	{
+		thr.push_back(pro->GetSour());
+		for(int i=0;i<pro->GetThroughSize();i++)
+			thr.push_back(pro->GetThrough(i));
+		thr.push_back(pro->GetDest());
+	}
+}
+
+void CGreedyDFS::DoSolve(void)
+{
+	//初始点为起始点
+	vector<int> vp(1, thr[0]);
+	vector<bool> visited(thr.size());
+
+	//
+	sres.minCost=UNDEFINE;
+	__dfs(0, 0, vp, visited, 0);
+}
+
+void CGreedyDFS::__dfs(int code, int cost, vector<int> vp, vector<bool> visited, int deep)
+{
+	if ((clock() >= pro->StartTime + CLOCKS_PER_SEC * 9)||bkFg)
+	{
+		bkFg=true;
+		return ;
+	}
+
+	//code标记为已经参观过
+	visited[code]=true;
+
+	//判断到没到终点
+	if(thr[code]==pro->GetDest())
+	{
+		if(!__isThrAllVisited(visited))	return ;	//只要有一个必经点没到，都退出
+		__updateAnswer(cost, vp);
+	}
+	//非终点，进行下一次递归
+	else
+	{
+		multimap<int, int> gcIndex;
+		vector<int> costSet(thr.size());
+		vector<vector<int>> pathSet(thr.size());
+
+		//已经到过的必经点，无法达到的点，不该到的终点，超过已知路径权值的必经点，都不会记录进去
+		for(int i=0; i<thr.size(); i++)
+		{	
+			vector<int> tmpPath;
+			vector<int> cannotThrough(vp);
+
+			if(visited[i])	continue;										//不能是已经经过的点 也 不能使无法到达的点
+			if((deep!=(thr.size()-2))&&(i==thr.size()-1))	continue;		//不该到终点的时候，就该跳过
+
+//			__loadCannotThrough(cannotThrough, i);
+			int cst=pro->mGraph->Shortest(thr[code], thr[i], &tmpPath, cannotThrough);
+			
+			//在求出来的前提下，若到thr[i]的路径的损耗已经大于已知答案的最小损耗，跳过
+			if(sres.fg && sres.minCost<=cost+cst)
+				continue;
+
+			if(cst!=UNDEFINE)
+			{
+				switch(greedyMethod)
+				{
+				case 0:
+					gcIndex.insert(pair<int, int>(tmpPath.size(), i));
+					break;
+				case 1:
+					gcIndex.insert(pair<int, int>(cst, i));
+					break;
+				default:
+					gcIndex.insert(pair<int, int>(tmpPath.size(), i));
+					break;
+				}
+				pathSet[i]=vp;
+				costSet[i]=cst;
+				Combine(pathSet[i], tmpPath);
+			}
+		}
+
+		for(auto b=gcIndex.begin(); b!=gcIndex.end(); b++)
+		{
+			if(b->first==UNDEFINE)	continue;
+
+			__dfs(b->second, cost+costSet[b->second], pathSet[b->second], visited, deep+1);
+			if(bkFg)	return ;
+		}
+	}
+}
+
+bool CGreedyDFS::__isThrAllVisited(const std::vector<bool> &vis)
+{
+	for(int i=0; i<thr.size(); i++)
+	{
+		if(!vis[i])
+			return false;
+	}
+	return true;
+}
+
+void CGreedyDFS::__updateAnswer(int cost, const std::vector<int> route)
+{
+	sres.fg=true;
+	if(cost<sres.minCost)
+	{
+		sres.pathVertesxSet=route;
+		sres.minCost=cost;
+	}
+	if(sres.minCost==143)	bkFg=true;
+}
+
+void CGreedyDFS::__loadCannotThrough(std::vector<int> &cannotThrough, int arivPos)
+{
+	for(int i=0; i<thr.size(); i++)
+	{
+		if(i!=arivPos)
+		{
+			int cur=thr[i];
+			cannotThrough.push_back(cur);
+/*
+			while(pro->mGraph->revAdjList->at(cur).size()==1)		//当前点只有一个入度
+			{
+				cur = pro->mGraph->revAdjList->at(cur)[0];			//去进入该点的点
+				cannotThrough.push_back(cur);
+			}
+*/
+		}
+	}
+}

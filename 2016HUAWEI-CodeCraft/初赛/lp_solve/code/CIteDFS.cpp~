@@ -1,0 +1,180 @@
+#include "CIteDFS.h"
+
+#include "CGraph.h"
+#include "CProblem.h"
+#include <ctime>
+#include <stack>
+#include <queue>
+#include <algorithm>
+
+using namespace std;
+using namespace CIteDFS_SPACE;
+
+VERTEX_PROPER getBufferFirst(queue<VERTEX_PROPER> &st)
+{
+	return st.front();
+}
+
+VERTEX_PROPER getBufferFirst(stack<VERTEX_PROPER> &st)
+{
+	return st.top();
+}
+
+VERTEX_PROPER::VERTEX_PROPER(int _id, int vNum):id(_id),cost(0)
+{
+	visited.resize(vNum, false);
+}
+
+VERTEX_PROPER::VERTEX_PROPER(int _id, const VERTEX_PROPER &node)
+{
+	this->id = _id;
+	this->cost = node.cost;
+	this->visited = node.visited;
+	this->vp = node.vp;
+}
+
+CIteDFS::CIteDFS(CProblem *pro):CSolveInterface(pro),bkFg(false)
+{ 
+	mVertexStateCost.resize(pro->mGraph->GetVertexNum());
+
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		thr.push_back(pro->GetThrough(i));
+	}
+}
+
+void CIteDFS::DoSolve(void)
+{
+	sres.fg=false;
+	sres.minCost=UNDEFINE;
+	__dfs();
+}
+
+void CIteDFS::__dfs(void)
+{
+	stack<VERTEX_PROPER> st;
+	st.push(VERTEX_PROPER(pro->GetSour(), pro->mGraph->GetVertexNum()));
+
+	while(!st.empty())
+	{
+		if( clock()>pro->StartTime + CLOCKS_PER_SEC*8 )	break;
+
+		VERTEX_PROPER node=getBufferFirst(st);
+		st.pop();
+
+		//记录当前过的路径
+		node.visited[node.id]=true;
+		node.vp.push_back(node.id);
+
+		//剪枝
+		if(__cutVer(node.id, node.cost, node.vp, node.visited))		continue;
+
+		//找到了
+		if(node.id==pro->GetDest())
+		{
+			if(!__isIncludeFullThr(node.visited))	continue;
+			__updateAnswer(node.cost, node.vp);
+		}
+		else
+		{
+/*
+			multimap<double, int> mmp;
+
+			for(auto b=pro->mGraph->mAdjList->at(node.id).begin(); b!=pro->mGraph->mAdjList->at(node.id).end(); b++)
+			{
+				if(node.visited[*b])	continue;
+				mmp.insert(pair<double, int>(count(thr.begin(), thr.end(), *b)*100 + pro->mGraph->GetArc(node.id, *b), *b));
+			}
+
+			for(auto b=mmp.begin(); b!=mmp.end(); b++)
+			{
+				VERTEX_PROPER p(b->second, node);
+				p.cost=node.cost+pro->mGraph->GetArc(node.id, b->second);
+				st.push(p);
+			}
+*/
+			
+			for(auto b=pro->mGraph->mAdjList->at(node.id).begin(); b!=pro->mGraph->mAdjList->at(node.id).end(); b++)
+			{
+				if(node.visited[*b])	continue;
+				VERTEX_PROPER p(*b, node);
+				p.cost=node.cost+pro->mGraph->GetArc(node.id, *b);
+				st.push(p);
+			}
+			
+		}
+	}
+}
+
+bool CIteDFS::__cutVer(int code, int cost, const std::vector<int> &vp, const std::vector<bool> &visited)
+{
+	//1).conditoin:在已经跑出来的情况下，若当前路径到当前点时，权值比已有路径大，就没必要继续往下跑了！
+	if((sres.fg)&&(cost>sres.minCost))
+	{
+		return true;
+	}
+
+	//2).conditoin:历史状态刷新失败，因为历史状态的损耗比这次的好，因此cut掉
+	if(!__updateVertexState(code, cost, vp, visited))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool CIteDFS::__updateVertexState(int code, const int cost, const vector<int> &vp, const vector<bool> &visited)
+{
+	int thrNum=0;			//必经点个数
+	int thrSum=0;			//必经点编号和
+	int &state = thrNum;
+	
+	//计算状态
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		if(visited[pro->GetThrough(i)])
+		{
+			thrNum++;
+			thrSum+=pro->GetThrough(i);
+		}
+	}
+	
+	//刷新状态
+	if( mVertexStateCost[code].count(state)==0 )
+	{
+		mVertexStateCost[code][state] = cost;
+		return true;		//已经刷新
+	}
+	else
+	{
+		if(mVertexStateCost[code].at(state)>cost)
+		{
+			mVertexStateCost[code].at(state) = cost;
+			return true;	//已经刷新
+		}
+		else
+			return false;	//没办法, 没有刷新，因为新状态没有以前的好。
+	}
+}
+
+bool CIteDFS::__isIncludeFullThr(const std::vector<bool> &vis)
+{
+	//只要有一个必经点没到，都退出
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		if(!vis[pro->GetThrough(i)])
+			return false;
+	}
+
+	return true;
+}
+
+void CIteDFS::__updateAnswer(const int cost, const std::vector<int> &vp)
+{
+	sres.fg=true;
+	if(sres.minCost>cost)
+	{
+		sres.pathVertesxSet=vp;
+		sres.minCost=cost;
+	}
+}

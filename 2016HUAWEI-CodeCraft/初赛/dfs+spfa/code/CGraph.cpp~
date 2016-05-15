@@ -1,0 +1,136 @@
+#include "CGraph.h"
+#include "memo.h"
+
+#include "CShortestInterface.h"
+
+#include <stdio.h>
+#include <string>
+#include <vector>
+#include <set>
+#include <sstream>
+#include <algorithm>
+
+
+/*************************************************************************
+GRAPH.cpp
+description:
+	负责GRAPH类包括构造在内的基本操作
+interface:
+	GRAPH(graph, e)											构造函数
+***************************************************************************/
+
+using namespace std;
+
+CGraph::~CGraph()
+{
+	Release2DMemory(mArc, miVertexNum, miVertexNum);
+	Release2DMemory(mEdgeCode, miVertexNum, miVertexNum);
+	if(mAdjList)	delete mAdjList;
+}
+
+CGraph::CGraph(char **graph, const int &e):miEdgeNum(e), mSi(NULL),mAdjList(NULL)
+{	
+	set<int> Vertex;
+	int bufSize=700;
+	int **edgeCodeBuf = Apply2DMemory(bufSize, bufSize);
+	int **arcBuf = Apply2DMemory(bufSize, bufSize);
+	mAdjList=new vector<vector<int>> (600);
+	revAdjList=new vector<vector<int>> (600);
+
+	//1).初始化邻接矩阵
+	for(int i=0; i<bufSize; i++)
+	{
+		for(int j=0; j<bufSize; j++)
+		{
+			arcBuf[i][j]=UNDEFINE;
+			edgeCodeBuf[i][j]=UNDEFINE;
+		}
+	}
+
+	//2).配置邻接矩阵
+	for(int i=0; i<e; i++)
+	{
+		string str(graph[i]);
+		int value[4], c=0, cnt=0;
+
+		//替换空格
+		while((c=str.find(','))!=-1)	str[c]=' ';
+
+		//
+		istringstream ss(str);		//transform to istringstream!
+		while(ss>>value[cnt++]);
+
+		Vertex.insert(value[1]);
+		Vertex.insert(value[2]);
+
+		//更新邻接矩阵
+		if(value[3]<arcBuf[value[1]][value[2]])		//待赋权重比矩阵中的权重小时
+		{
+			if(arcBuf[value[1]][value[2]]==UNDEFINE)	
+			{
+				mAdjList->at(value[1]).push_back(value[2]);
+				mAdjList->at(value[2]).push_back(value[1]);
+			}
+			arcBuf[value[1]][value[2]] = value[3];
+			edgeCodeBuf[value[1]][value[2]] = value[0];
+		}
+	}
+
+	//3).计算顶点数
+	auto c=Vertex.end();c--;
+	miVertexNum = *(c)+1;
+
+	//
+	mArc=Apply2DMemory(miVertexNum, miVertexNum);
+	mEdgeCode=Apply2DMemory(miVertexNum, miVertexNum);
+
+	for(int i=0; i<miVertexNum; i++)
+	{
+		for(int j=0; j<miVertexNum; j++)
+		{
+			mArc[i][j]=arcBuf[i][j];
+			mEdgeCode[i][j]=edgeCodeBuf[i][j];
+		}
+	}
+	
+	//finial
+	Release2DMemory(arcBuf, bufSize, bufSize);
+	Release2DMemory(edgeCodeBuf, bufSize, bufSize);
+}
+
+int CGraph::Shortest(int v, int w, vector<int> *pathML, const vector<int> &outVertex)
+{
+	if(mSi)
+		return mSi->DoShortest(this, v, w, pathML,outVertex);
+	else
+		return -1;
+}
+
+void CGraph::SetShortest(CShortestInterface *si_)
+{
+	if(mSi!=NULL)
+		delete mSi;
+	else
+		mSi=si_;
+}
+
+//预处理...将终点的出度设置为0
+void CGraph::PerprocessGraph(int dest)
+{
+	//将权值邻接矩阵和编号邻接矩阵中，以终点为from的边，全置为UNDEFINE
+	for(int i=0; i<miVertexNum; i++)
+	{
+		mArc[dest][i]=UNDEFINE;
+		mEdgeCode[dest][i]=UNDEFINE;
+	}
+	//将邻接表中的dest出去抵达的点，清空
+	mAdjList->at(dest).clear();
+}
+
+void CGraph::SortAdjList(void)
+{
+	for(int i=0; i<mAdjList->size(); i++)
+	{
+		sort(mAdjList->at(i).begin(), mAdjList->at(i).end());
+	}
+}

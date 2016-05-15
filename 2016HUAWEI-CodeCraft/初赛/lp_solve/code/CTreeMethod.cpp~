@@ -1,0 +1,180 @@
+#include "CTreeMethod.h"
+
+#include "CGraph.h"
+#include "CProblem.h"
+#include <algorithm>
+
+using namespace std;
+
+CTreeMethod::CTreeMethod(CProblem *pro):CSolveInterface(pro),treeFinished(false),treeThrNum(0)
+{ 
+	for(int i=0; i<pro->GetThroughSize(); i++)
+	{
+		thr.push_back(pro->GetThrough(i));
+	}
+	thr.push_back(pro->GetDest());
+}
+
+void CTreeMethod::DoSolve(void)
+{
+	__search();
+}
+
+void CTreeMethod::__search()
+{
+
+	do
+	{
+		vector<bool> visited(pro->mGraph->GetVertexNum(), false);
+		vector<int> vertRoute;
+		vector<int> frontNode;
+		SIBP tmpSibp(shallowestSibp);										//缓存之前的分岔点
+
+		//0).重置信息
+		treeFinished=false;
+		treeThrNum=0;
+		frontNode=shallowestSibp.route;
+		frontNode.push_back(shallowestSibp.nxtLstId);
+		
+		shallowestSibp.deep=UNDEFINE;
+		shallowestSibp.id=UNDEFINE;
+		shallowestSibp.nxtLstId=UNDEFINE;
+
+		//1).深度优先搜索建树,返回最浅分岔点信息
+		__dfsTree(pro->GetSour(), 1, vertRoute, visited, frontNode);		//先从root节点(起点)建树，root所在深度为1
+
+		//2).建树失败处理
+		__treeFalseProcess(tmpSibp);
+
+//		__outputDebug();
+
+	}while(!sres.fg);	//继续的条件是没找到解，并且分岔点存在.否则不是找到解，就是无解
+
+}
+
+void CTreeMethod::__dfsTree(int id, int deep, vector<int> vertRoute, vector<bool> visited, const vector<int> &frontNode)
+{
+	auto bgnItr=pro->mGraph->mAdjList->at(id).begin();		//当前节点的子节点首迭代器
+	visited[id]=true;										//记录id到过
+	vertRoute.push_back(id);
+	
+	//建树完成
+	if(__isTreeFinish(id))	
+	{	
+		cout<<"over!!"<<endl;
+		//建树完成，没有分岔点....非常好....此时已经找完了
+		if(shallowestSibp.deep==UNDEFINE)
+		{
+			sres.fg=true;
+			sres.pathVertesxSet=vertRoute;
+		}
+		return ;
+	}
+	/**/
+	//根据frontNode配置首迭代器
+	if(deep<frontNode.size())			//
+	{
+		bgnItr = find(pro->mGraph->mAdjList->at(id).begin(), pro->mGraph->mAdjList->at(id).end(), frontNode[(deep+1)-1]);
+	}
+
+	for(auto b=bgnItr; b!=pro->mGraph->mAdjList->at(id).end(); b++)
+	{
+		if(visited[*b])	continue;
+		__dfsTree(*b, deep+1, vertRoute, visited, frontNode);
+		if(treeFinished)	return ;			//建树完成
+
+		//当访问当前节点的子节点时，
+		//若子节点非第一个子节点，那么当前节点就是分岔点，此时刷新分岔点信息
+		auto tmpb=b;
+		tmpb++;
+		if((tmpb!=pro->mGraph->mAdjList->at(id).end())&&(!visited[*tmpb]))
+		{
+			if(deep<=shallowestSibp.deep)		//深度小于或等于当前已知最浅分岔点，才刷新.
+			{
+				shallowestSibp.deep=deep;
+				shallowestSibp.id=id;
+				shallowestSibp.nxtLstId=*tmpb;
+				shallowestSibp.route=vertRoute;
+			}
+		}
+	}
+}
+
+bool CTreeMethod::__isTreeFinish(int id)
+{
+	if( find(thr.begin(), thr.end(), id) != thr.end() )
+	{
+		treeThrNum++;
+		if(treeThrNum==thr.size())
+		{
+			treeFinished=true;
+			return true;
+		}
+	}
+	return false;
+}
+
+void CTreeMethod::__treeFalseProcess(const SIBP &lastSibp)
+{
+	if(!treeFinished)
+	{
+		vector<list<int>> *adjList=pro->mGraph->mAdjList;
+		int lastId=lastSibp.id;
+		//建树失败回到之前的分岔点状态
+		shallowestSibp=lastSibp;
+
+		//调整分岔点属性
+		//.route
+		//.id
+		//.nxtLstId
+		do
+		{
+			bool isNodeExist=true;
+
+			shallowestSibp.deep--;
+			//将分岔点设为父节点
+			shallowestSibp.route.pop_back();
+			shallowestSibp.id=shallowestSibp.route.back();	//
+
+			//设置新分岔点的下一个节点
+			auto ito=find(adjList->at(shallowestSibp.id).begin(),adjList->at(shallowestSibp.id).end(),lastId);
+			lastId=shallowestSibp.id;
+
+			do
+			{
+				ito++;
+				//该节点不存在
+				if(ito==adjList->at(shallowestSibp.id).end())
+				{
+					isNodeExist=false;
+					break;
+				}
+			}while( find(shallowestSibp.route.begin(), shallowestSibp.route.end(), *ito)!=shallowestSibp.route.end() );
+			//检查该点是否合法
+			
+			if(!isNodeExist)
+				continue;
+			shallowestSibp.nxtLstId=*ito;
+			break;
+		}while(true);
+	}
+}
+
+void CTreeMethod::__outputDebug(void)
+{
+	static int cnt=0;
+	cnt++;
+	cout<<cnt<<"th create tree"<<endl;
+	if(treeFinished)
+	{
+		cout<<"success!!!"<<endl;
+		cout<<"deep: "<<shallowestSibp.deep<<endl;
+		cout<<"id: "<<shallowestSibp.id<<endl;
+		cout<<"nxtLstId: "<<shallowestSibp.nxtLstId<<endl;
+		cout<<"******************************************"<<endl;
+	}
+	else
+	{
+		cout<<"false!!!"<<endl;
+	}
+}

@@ -1,0 +1,37 @@
+#ifndef __CLU_DFS_OPT_H
+#define __CLU_DFS_OPT_H
+
+#include "CSolveInterface.h"
+
+#include <vector>
+#include <map>
+#include <set>
+
+class CLuDFSopt:public CSolveInterface
+{
+	/* constructor and decontructor */
+public:
+	CLuDFSopt(CProblem *pro=NULL);
+	~CLuDFSopt(){}
+	
+	/* interface */
+public:
+	void DoSolve(void);
+
+	/* member fun */
+private:
+	void __dfs(int code, int cost, std::vector<int> vp, std::vector<bool> visited, int deep);
+	bool __cutVer(int code, int cost, const std::vector<bool> &visited);
+	bool __updateVertexState(int code, int cost, const std::vector<bool> &visited);
+	void __updateAnswer(const int cost, const std::vector<int> &vp);
+	bool __isIncludeFullThr(const std::vector<bool> &vis);
+
+	/* member var */
+private:
+	std::vector<std::map<int, int>> mVertexStateCost;
+	int startId;
+	int endId;
+	bool bkFg;
+};
+
+#endif
